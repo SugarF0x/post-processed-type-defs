@@ -81,4 +81,5 @@ export interface Step {
 export interface Module {
   id: string
   steps: Step[]
+  questions: Question[]
 }
