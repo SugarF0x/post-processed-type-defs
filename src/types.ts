@@ -57,3 +57,28 @@ export interface Question {
   id: QuestionId
   config: QuestionConfig
 }
+
+export enum Condition {
+  EQUALS = 'EQUALS',
+  NOT_EQUALS = 'NOT_EQUALS',
+  UNDER = 'UNDER',
+  OVER = 'OVER',
+  CONTAINS = 'CONTAINS',
+  NOT_CONTAINS = 'NOT_CONTAINS',
+}
+
+export interface NestedStep {
+  answer: unknown
+  condition: Condition
+  steps: Step[]
+}
+
+export interface Step {
+  id: QuestionId
+  nestedStep?: NestedStep
+}
+
+export interface Module {
+  id: string
+  steps: Step[]
+}
