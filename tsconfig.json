@@ -1,7 +1,13 @@
 {
+  "ts-node": {
+    "esm": true
+  },
   "compilerOptions": {
-    "module": "ESNext",
-    "target": "ESNext"
+    "module": "NodeNext",
+    "strict": true,
+    "target": "es2017",
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true
   },
   "exclude": [
     "node_modules"
