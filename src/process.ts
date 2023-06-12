@@ -1,11 +1,13 @@
 import { writeFileSync } from "node:fs"
+import { join } from "node:path"
 import deepForEach from "./utils/deepForEach.ts"
-import { QuestionId, QuestionType } from "./types.ts"
+import { QuestionId } from "./types.ts"
 
-(async () => {
-  const output: string[] = []
+const TARGET_FILE = "./module.ts"
+const TEMPLATE_TARGET = "<TARGET>"
 
-  const { default: modules } = await import('./module.ts')
+;(async () => {
+  const { default: modules } = await import(TARGET_FILE) as { default: Record<string, any> }
 
   const constantIds: QuestionId[] = []
   const variableIds: QuestionId[] = []
@@ -20,8 +22,22 @@ import { QuestionId, QuestionType } from "./types.ts"
     })
   }
 
-  console.log(constantIds)
-  console.log(variableIds)
+  const output: string[] = [
+    'export interface Map {',
+    TEMPLATE_TARGET,
+    `}`
+  ]
 
-  writeFileSync('./output.d.ts', output.join('\n'), { encoding: 'utf-8' })
+  for (const id of constantIds) {
+    const targetIndex = output.indexOf(TEMPLATE_TARGET)
+    output.splice(targetIndex, 0, `  ${id}: true`)
+  }
+
+  for (const id of variableIds) {
+    const targetIndex = output.indexOf(TEMPLATE_TARGET)
+    output.splice(targetIndex, 0, `  ${id}?: true`)
+  }
+
+  output.splice(output.indexOf(TEMPLATE_TARGET), 1)
+  writeFileSync(join(__dirname, './output.d.ts'), output.join('\n'), { encoding: 'utf-8' })
 })()
