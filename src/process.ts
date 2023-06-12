@@ -3,53 +3,65 @@ import { join } from "node:path"
 import deepForEach from "./utils/deepForEach.ts"
 import { QuestionId } from "./types.ts"
 
-async function processQuestions(questionsPath: string): Promise<string[]> {
-  const { default: questions } = await import(questionsPath) as { default: Record<string, any> }
+interface QuestionMeta {
+  id: string
+  type: string
+  isDefinitive?: boolean
+}
 
+function createInterface(questionMeta: QuestionMeta[]): string {
   const output = [
     'export interface QuestionIdToAnswerTypeMap {'
   ]
 
-  for (const question of Object.values(questions)) {
-    output.push(`  ${question.id}: "${question.config.type}"`)
+  for (const { id, type, isDefinitive } of questionMeta) {
+    output.push(`  ${id}${isDefinitive ? '' : '?'}: "${type}"`)
   }
 
   output.push('}')
+  return output.join('\n')
+}
+
+async function processQuestions(questionsPath: string): Promise<QuestionMeta[]> {
+  const { default: questions } = await import(questionsPath) as { default: Record<string, any> }
+
+  const output: QuestionMeta[] = []
+
+  for (const question of Object.values(questions)) {
+    output.push({ id: question.id, type: question.config.type })
+  }
+
   return output
 }
 
-async function processModule(modulePath: string): Promise<string[]> {
+async function processModule(modulePath: string, questionsMeta: QuestionMeta[]): Promise<QuestionMeta[]> {
   const { default: modules } = await import(modulePath) as { default: Record<string, any> }
+  const allIds = questionsMeta.map(e => e.id)
 
-  const constantIds: QuestionId[] = []
-  const variableIds: QuestionId[] = []
+  const output: QuestionMeta[] = [...questionsMeta]
 
   for (const module of Object.values(modules)) {
     deepForEach(module.steps, (value, key, _, path) => {
-      if (key === 'id') {
-        const id = value as QuestionId
-        if (path.includes('nested')) variableIds.push(id)
-        else constantIds.push(id)
-      }
+      if (key !== 'id') return
+      const id = value as string
+
+      const questionIndex = allIds.indexOf(id)
+      if (questionIndex === -1) throw new Error(`Question ${id} is required in module steps but not found in configuration`)
+
+      output[questionIndex].isDefinitive = !path.includes('nested')
     })
   }
 
-  const output: string[] = [
-    'export interface Map {',
-  ]
-
-  for (const id of constantIds) output.push(`  ${id}: true`)
-  for (const id of variableIds) output.push(`  ${id}?: true`)
-
-  output.push('}')
   return output
 }
 
 async function main() {
-  const questionTypes = await processQuestions('./questions.ts')
-  const questionDefinitionState = await processModule('./module.ts')
+  const questionsMeta = await processQuestions('./questions.ts')
+  const moduleQuestionsMeta = await processModule('./module.ts', questionsMeta)
 
-  writeFileSync(join(__dirname, './output.d.ts'), [...questionTypes, '\n', ...questionDefinitionState].join('\n'), { encoding: 'utf-8' })
+  const moduleQuestionsInterface = createInterface(moduleQuestionsMeta)
+
+  writeFileSync(join(__dirname, './output.d.ts'), moduleQuestionsInterface, { encoding: 'utf-8' })
 }
 
 void main()
