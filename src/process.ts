@@ -3,11 +3,23 @@ import { join } from "node:path"
 import deepForEach from "./utils/deepForEach.ts"
 import { QuestionId } from "./types.ts"
 
-const TARGET_FILE = "./module.ts"
-const TEMPLATE_TARGET = "<TARGET>"
+async function processQuestions(questionsPath: string): Promise<string[]> {
+  const { default: questions } = await import(questionsPath) as { default: Record<string, any> }
 
-;(async () => {
-  const { default: modules } = await import(TARGET_FILE) as { default: Record<string, any> }
+  const output = [
+    'export interface QuestionIdToAnswerTypeMap {'
+  ]
+
+  for (const question of Object.values(questions)) {
+    output.push(`  ${question.id}: "${question.config.type}"`)
+  }
+
+  output.push('}')
+  return output
+}
+
+async function processModule(modulePath: string): Promise<string[]> {
+  const { default: modules } = await import(modulePath) as { default: Record<string, any> }
 
   const constantIds: QuestionId[] = []
   const variableIds: QuestionId[] = []
@@ -24,20 +36,20 @@ const TEMPLATE_TARGET = "<TARGET>"
 
   const output: string[] = [
     'export interface Map {',
-    TEMPLATE_TARGET,
-    `}`
   ]
 
-  for (const id of constantIds) {
-    const targetIndex = output.indexOf(TEMPLATE_TARGET)
-    output.splice(targetIndex, 0, `  ${id}: true`)
-  }
+  for (const id of constantIds) output.push(`  ${id}: true`)
+  for (const id of variableIds) output.push(`  ${id}?: true`)
 
-  for (const id of variableIds) {
-    const targetIndex = output.indexOf(TEMPLATE_TARGET)
-    output.splice(targetIndex, 0, `  ${id}?: true`)
-  }
+  output.push('}')
+  return output
+}
 
-  output.splice(output.indexOf(TEMPLATE_TARGET), 1)
-  writeFileSync(join(__dirname, './output.d.ts'), output.join('\n'), { encoding: 'utf-8' })
-})()
+async function main() {
+  const questionTypes = await processQuestions('./questions.ts')
+  const questionDefinitionState = await processModule('./module.ts')
+
+  writeFileSync(join(__dirname, './output.d.ts'), [...questionTypes, '\n', ...questionDefinitionState].join('\n'), { encoding: 'utf-8' })
+}
+
+void main()
