@@ -7,15 +7,19 @@ interface QuestionMeta {
   id: string
   type: string
   isDefinitive?: boolean
+  enumKey?: string
 }
 
 function createInterface(questionMeta: QuestionMeta[]): string {
+  // TODO: have it somehow actually use the pre defined enums
+  //  maybe mayhaps dunno, not sure this is even needed that much tbh
+
   const output = [
     'export interface QuestionIdToAnswerTypeMap {'
   ]
 
-  for (const { id, type, isDefinitive } of questionMeta) {
-    output.push(`  ${id}${isDefinitive ? '' : '?'}: "${type}"`)
+  for (const { id, enumKey, type, isDefinitive } of questionMeta) {
+    output.push(`  ${enumKey ?? id}${isDefinitive ? '' : '?'}: "${type}"`)
   }
 
   output.push('}')
@@ -28,7 +32,9 @@ async function processQuestions(questionsPath: string): Promise<QuestionMeta[]> 
   const output: QuestionMeta[] = []
 
   for (const question of Object.values(questions)) {
-    output.push({ id: question.id, type: question.config.type })
+    const enumKey = Object.entries(QuestionId).find(([key, value]) => value === question.id)?.[0]
+
+    output.push({ id: question.id, enumKey: enumKey ? `[QuestionId.${enumKey}]` : undefined, type: question.config.type })
   }
 
   return output
@@ -61,7 +67,15 @@ async function main() {
 
   const moduleQuestionsInterface = createInterface(moduleQuestionsMeta)
 
-  writeFileSync(join(__dirname, './output.d.ts'), moduleQuestionsInterface, { encoding: 'utf-8' })
+  const outputPath = './output.d.ts'
+
+  const output: string[] = [
+    `import { QuestionId } from "./types"`,
+    ``,
+    moduleQuestionsInterface
+  ]
+
+  writeFileSync(join(__dirname, outputPath), output.join('\n'), { encoding: 'utf-8' })
 }
 
 void main()
